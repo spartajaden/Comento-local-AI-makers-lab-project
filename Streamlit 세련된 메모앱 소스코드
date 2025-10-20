@@ -1,0 +1,226 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import json
+import os
+
+# 페이지 설정
+st.set_page_config(page_title="메모 앱", layout="wide")
+
+# CSS를 사용하여 세련된 디자인 적용
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #ffffff;
+    }
+    .main-header {
+        font-family: 'Helvetica Neue', sans-serif;
+        color: #1E88E5;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #f0f0f0;
+        margin-bottom: 30px;
+    }
+    .memo-container {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border-left: 5px solid #1E88E5;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
+    }
+    .memo-container:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .memo-title {
+        font-weight: bold;
+        font-size: 18px;
+        color: #333;
+    }
+    .memo-date {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 10px;
+    }
+    .memo-content {
+        color: #444;
+        line-height: 1.6;
+    }
+    .sidebar-header {
+        color: #1E88E5;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+    .stButton>button {
+        background-color: #1E88E5;
+        color: white;
+        border-radius: 5px;
+        border: none;
+        padding: 5px 15px;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #1976D2;
+    }
+    .delete-btn>button {
+        background-color: #ff5252;
+    }
+    .delete-btn>button:hover {
+        background-color: #e53935;
+    }
+    .search-box {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 20px;
+        background-color: #f8f9fa;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# 앱 제목
+st.markdown("<h1 class='main-header'>📝 세련된 메모 앱</h1>", unsafe_allow_html=True)
+
+# 세션 상태 초기화
+if 'memos' not in st.session_state:
+    st.session_state.memos = []
+
+# 파일에서 메모 불러오기 (선택사항)
+def load_memos():
+    try:
+        if os.path.exists("memos.json"):
+            with open("memos.json", "r") as f:
+                return json.load(f)
+    except Exception as e:
+        st.error(f"메모를 불러오는 중 오류가 발생했습니다: {e}")
+    return []
+
+# 파일에 메모 저장하기 (선택사항)
+def save_memos(memos):
+    try:
+        with open("memos.json", "w") as f:
+            json.dump(memos, f)
+    except Exception as e:
+        st.error(f"메모를 저장하는 중 오류가 발생했습니다: {e}")
+
+# 앱 시작 시 메모 불러오기
+if len(st.session_state.memos) == 0:
+    st.session_state.memos = load_memos()
+
+# 사이드바 - 메모 작성
+with st.sidebar:
+    st.markdown("<h2 class='sidebar-header'>✏️ 새 메모 작성</h2>", unsafe_allow_html=True)
+    
+    memo_title = st.text_input("제목", placeholder="메모 제목을 입력하세요")
+    memo_content = st.text_area("내용", height=200, placeholder="메모 내용을 입력하세요")
+    
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("💾 저장", key="save_memo"):
+            if memo_title and memo_content:
+                # 새 메모 생성
+                new_memo = {
+                    "id": datetime.now().timestamp(),  # 고유 ID 생성
+                    "title": memo_title,
+                    "content": memo_content,
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                
+                # 메모 리스트에 추가
+                st.session_state.memos.append(new_memo)
+                save_memos(st.session_state.memos)  # 파일에 저장 (선택사항)
+                
+                st.success("메모가 저장되었습니다!")
+                # 입력 필드 초기화
+                st.rerun()  # experimental_rerun() 대신 rerun() 사용
+            else:
+                st.warning("제목과 내용을 모두 입력해주세요.")
+    
+    st.markdown("---")
+    st.markdown("### 📊 통계")
+    st.markdown(f"📝 **총 메모 수**: {len(st.session_state.memos)}개")
+    
+    if st.session_state.memos:
+        last_memo_date = max([memo['date'] for memo in st.session_state.memos])
+        st.markdown(f"🕒 **마지막 작성**: {last_memo_date}")
+
+# 메인 화면 - 메모 목록 표시
+col1, col2 = st.columns([3, 1])
+with col1:
+    st.markdown("### 📋 메모 목록")
+with col2:
+    sort_option = st.selectbox(
+        "정렬 방식",
+        ["최신순", "오래된순", "제목순"],
+        index=0
+    )
+
+# 검색 기능
+st.markdown("<div class='search-box'>", unsafe_allow_html=True)
+search_term = st.text_input("🔍 메모 검색", "", placeholder="검색어를 입력하세요")
+st.markdown("</div>", unsafe_allow_html=True)
+
+# 메모가 없는 경우
+if not st.session_state.memos:
+    st.info("저장된 메모가 없습니다. 왼쪽 사이드바에서 새 메모를 작성해보세요!")
+else:
+    # 메모 필터링
+    filtered_memos = st.session_state.memos
+    if search_term:
+        filtered_memos = [memo for memo in st.session_state.memos 
+                         if search_term.lower() in memo['title'].lower() 
+                         or search_term.lower() in memo['content'].lower()]
+    
+    # 메모 정렬
+    if sort_option == "최신순":
+        filtered_memos = sorted(filtered_memos, key=lambda x: x['date'], reverse=True)
+    elif sort_option == "오래된순":
+        filtered_memos = sorted(filtered_memos, key=lambda x: x['date'])
+    else:  # 제목순
+        filtered_memos = sorted(filtered_memos, key=lambda x: x['title'])
+    
+    # 검색 결과 표시
+    if search_term and filtered_memos:
+        st.success(f"'{search_term}'에 대한 검색 결과: {len(filtered_memos)}개의 메모를 찾았습니다.")
+    elif search_term and not filtered_memos:
+        st.warning(f"'{search_term}'에 대한 검색 결과가 없습니다.")
+    
+    # 메모 표시
+    for memo in filtered_memos:
+        col1, col2 = st.columns([5, 1])
+        
+        with col1:
+            st.markdown(f"""
+            <div class="memo-container">
+                <div class="memo-title">{memo['title']}</div>
+                <div class="memo-date">📅 {memo['date']}</div>
+                <hr>
+                <div class="memo-content">{memo['content'].replace('\n', '<br>')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("<div class='delete-btn'>", unsafe_allow_html=True)
+            if st.button("🗑️ 삭제", key=f"delete_{memo['id']}"):
+                st.session_state.memos.remove(memo)
+                save_memos(st.session_state.memos)  # 파일에 저장 (선택사항)
+                st.success("메모가 삭제되었습니다.")
+                st.rerun()  # experimental_rerun() 대신 rerun() 사용
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# 모든 메모 삭제 기능
+if st.session_state.memos:
+    st.markdown("---")
+    col1, col2 = st.columns([4, 1])
+    with col2:
+        st.markdown("<div class='delete-btn'>", unsafe_allow_html=True)
+        if st.button("🗑️ 모든 메모 삭제"):
+            st.session_state.memos = []
+            save_memos([])  # 파일에 저장 (선택사항)
+            st.success("모든 메모가 삭제되었습니다.")
+            st.rerun()  # experimental_rerun() 대신 rerun() 사용
+        st.markdown("</div>", unsafe_allow_html=True)
